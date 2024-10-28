@@ -171,8 +171,10 @@ class CoprocessorUploader:
                 success = True
                 break
 
-            except BaseException as error:
+            except Exception as error:
                 operation_details = f'{error}'
+                self._response_coprocessor_fail(
+                operation_details)
                 time.sleep(RETRY_INTERVAL_S)
 
 
@@ -181,8 +183,7 @@ class CoprocessorUploader:
         else:
             self._response_coprocessor_fail(
                 operation_details)
-            # result is echoed to be readable for the calling script
-            print(response)
+
 
 
 if __name__ == '__main__':
