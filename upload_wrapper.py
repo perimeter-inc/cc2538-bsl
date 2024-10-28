@@ -72,17 +72,7 @@ def load_initial_response():
         'date': current_date_as_string,
         'operations': [
             {
-                'description': 'Upload Coprocessor 1 Firmware',
-                'is_success': False,
-                'details': 'Not Started'
-            },
-            {
-                'description': 'Upload Coprocessor 2 Firmware',
-                'is_success': False,
-                'details': 'Not Started'
-            },
-            {
-                'description': 'Upload Coprocessor 3 Firmware',
+                'description': 'Upload Coprocessor Firmware',
                 'is_success': False,
                 'details': 'Not Started'
             },
@@ -121,8 +111,6 @@ class CoprocessorUploader:
             self.coprocessors = [
                 extract_coprocessor(args[2:6])]
 
-            print(self.coprocessors)
-            exit    
             self.reset_controls = [
                 CoprocessorResetControl(reset_script_path, coprocessor)
                 for coprocessor in self.coprocessors
@@ -148,22 +136,27 @@ class CoprocessorUploader:
         self.response['operations'][0]['is_success'] = False
         self.response['operations'][0]['details'] = f'Could not setup upload: {error}'
 
-    def _response_coprocessor_not_requested(self, coprocessor_index):
-        self.response['operations'][coprocessor_index]['is_success'] = False
-        self.response['operations'][coprocessor_index]['details'] = f'Upload not requested'
+    def _response_coprocessor_not_requested(self):
+        self.response['operations'][0]['is_success'] = False
+        self.response['operations'][0]['details'] = f'Upload not requested'
 
-    def _response_coprocessor_success(self, coprocessor_index):
-        self.response['operations'][coprocessor_index]['is_success'] = True
-        self.response['operations'][coprocessor_index]['details'] = 'Success on upload'
+    def _response_coprocessor_success(self):
+        self.response['operations'][0]['is_success'] = True
+        self.response['operations'][0]['details'] = 'Success on upload'
 
-    def _response_coprocessor_fail(self, coprocessor_index, details):
-        self.response['operations'][coprocessor_index]['is_success'] = False
-        self.response['operations'][coprocessor_index]['details'] = f'{details}'
+    def _response_coprocessor_fail(self, details):
+        self.response['operations'][0]['is_success'] = False
+        self.response['operations'][0]['details'] = f'{details}'
 
     def _upload_one_coprocessor(self, coprocessor_index):
         MAX_RETRIES = 3
         RETRY_INTERVAL_S = 2
         success = False
+
+        if not self.coprocessors[coprocessor_index].should_upload:
+            self._response_coprocessor_not_requested()
+            return
+        
 
         upload_args = f'-e -w -v -p {self.coprocessors[coprocessor_index].serial_port} {self.firmware_path}'.split()
         operation_details = 'Not Started'
@@ -173,25 +166,23 @@ class CoprocessorUploader:
             try:
                 # import is wrapped in try block to catch import errors
 
-                print(upload_args)
                 from cc2538 import flash_main
                 flash_main(upload_args)
+                success = True
                 break
 
             except BaseException as error:
                 operation_details = f'{error}'
                 time.sleep(RETRY_INTERVAL_S)
 
-            else:
-                success = True
-                break
 
         if success:
-            self._upload_one_coprocessor(coprocessor_index)
-            self._response_coprocessor_success(coprocessor_index)
+            self._response_coprocessor_success()
         else:
             self._response_coprocessor_fail(
-                coprocessor_index, operation_details)
+                operation_details)
+            # result is echoed to be readable for the calling script
+            print(response)
 
 
 if __name__ == '__main__':
